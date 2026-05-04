@@ -1,0 +1,28 @@
+{
+  "name": "flora-backend",
+  "version": "1.0.0",
+  "description": "Flora Flower Boutique — REST API backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "db:create": "node db/create-database.js",
+    "db:init": "node db/init.js"
+  },
+  "keywords": ["flora", "flowers", "api", "express", "postgresql"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-validator": "^7.1.0",
+    "morgan": "^1.10.0",
+    "pg": "^8.11.5",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
