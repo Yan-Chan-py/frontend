@@ -6,16 +6,14 @@
  */
 const express = require('express');
 const router = express.Router();
-const { body } = require('express-validator');
 const ctrl = require('../controllers/bouquetsController');
-
-const bouquetValidation = [
-  body('name').trim().notEmpty().withMessage('Name is required'),
-  body('description').trim().notEmpty().withMessage('Description is required'),
-  body('price')
-    .isFloat({ min: 0 })
-    .withMessage('Price must be a positive number'),
-];
+const validateBody = require('../middlewares/validateBody');
+const upload = require('../middlewares/upload');
+const {
+  createBouquetSchema,
+  updateBouquetSchema,
+  updateFavoriteSchema,
+} = require('../schemas/bouquetSchemas');
 
 /**
  * @swagger
@@ -82,19 +80,22 @@ router.get('/:id', ctrl.getById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name, description, price]
+ *             required: [title, description, price]
  *             properties:
- *               name: { type: string }
+ *               title: { type: string }
  *               description: { type: string }
  *               price: { type: number }
- *               image_url: { type: string }
+ *               photoURL: { type: string }
  *               category: { type: string }
  *               is_bestseller: { type: boolean }
+ *               favorite: { type: boolean }
  *     responses:
  *       201:
  *         description: Created bouquet
+ *       400:
+ *         description: Validation error
  */
-router.post('/', ...bouquetValidation, ctrl.create);
+router.post('/', validateBody(createBouquetSchema), ctrl.create);
 
 /**
  * @swagger
@@ -114,19 +115,22 @@ router.post('/', ...bouquetValidation, ctrl.create);
  *           schema:
  *             type: object
  *             properties:
- *               name: { type: string }
+ *               title: { type: string }
  *               description: { type: string }
  *               price: { type: number }
- *               image_url: { type: string }
+ *               photoURL: { type: string }
  *               category: { type: string }
  *               is_bestseller: { type: boolean }
+ *               favorite: { type: boolean }
  *     responses:
  *       200:
  *         description: Updated bouquet
+ *       400:
+ *         description: Validation error / Empty body
  *       404:
  *         description: Not found
  */
-router.put('/:id', ...bouquetValidation, ctrl.update);
+router.put('/:id', validateBody(updateBouquetSchema), ctrl.update);
 
 /**
  * @swagger
@@ -146,5 +150,66 @@ router.put('/:id', ...bouquetValidation, ctrl.update);
  *         description: Not found
  */
 router.delete('/:id', ctrl.remove);
+
+/**
+ * @swagger
+ * /api/bouquets/{id}/favorite:
+ *   patch:
+ *     summary: Update bouquet favorite status
+ *     tags: [Bouquets]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [favorite]
+ *             properties:
+ *               favorite: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Updated bouquet
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Not found
+ */
+router.patch('/:id/favorite', validateBody(updateFavoriteSchema), ctrl.updateFavorite);
+
+/**
+ * @swagger
+ * /api/bouquets/{id}/photo:
+ *   patch:
+ *     summary: Upload and update bouquet image
+ *     tags: [Bouquets]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Updated bouquet with new photoURL
+ *       400:
+ *         description: Missing file or invalid type
+ *       404:
+ *         description: Not found
+ */
+router.patch('/:id/photo', upload.single('photo'), ctrl.updatePhoto);
 
 module.exports = router;

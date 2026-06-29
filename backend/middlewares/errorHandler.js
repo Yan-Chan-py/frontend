@@ -1,7 +1,18 @@
+const HttpError = require('../helpers/HttpError');
+
 /**
  * Global error handler middleware
  */
 const errorHandler = (err, req, res, next) => {
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  if (err instanceof HttpError || err.name === 'HttpError') {
+    console.error('❌', err.message);
+    return res.status(err.statusCode).json({ message: err.message });
+  }
+
   console.error('❌', err.stack || err.message);
 
   const status = err.status || err.statusCode || 500;

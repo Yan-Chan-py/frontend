@@ -1,21 +1,17 @@
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+const config = require('./config');
 const app = require('./app');
 const pool = require('./db/db');
 
-const PORT = process.env.PORT || 3001;
-
 async function start() {
   try {
-    // Test DB connection
     await pool.query('SELECT 1');
-    console.log('✅ Database connection verified');
+    console.log('Database connection successful');
 
-    app.listen(PORT, () => {
+    app.listen(config.port, () => {
       console.log(`\n🌸 Flora API is running!`);
-      console.log(`   Server:  http://localhost:${PORT}`);
-      console.log(`   API:     http://localhost:${PORT}/api`);
-      console.log(`   Swagger: http://localhost:${PORT}/api-docs\n`);
+      console.log(`   Server:  http://localhost:${config.port}`);
+      console.log(`   API:     http://localhost:${config.port}/api`);
+      console.log(`   Swagger: http://localhost:${config.port}/api-docs\n`);
     });
   } catch (err) {
     console.error('❌ Failed to connect to database:', err.message);

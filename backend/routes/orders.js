@@ -6,22 +6,9 @@
  */
 const express = require('express');
 const router = express.Router();
-const { body } = require('express-validator');
 const ctrl = require('../controllers/ordersController');
-
-const orderValidation = [
-  body('name').trim().notEmpty().withMessage('Name is required'),
-  body('phone')
-    .trim()
-    .notEmpty()
-    .withMessage('Phone is required')
-    .matches(/^\+?[\d\s\-().]{7,20}$/)
-    .withMessage('Invalid phone number format'),
-  body('quantity')
-    .optional()
-    .isInt({ min: 1, max: 99 })
-    .withMessage('Quantity must be between 1 and 99'),
-];
+const validateBody = require('../middlewares/validateBody');
+const { createOrderSchema } = require('../schemas/orderSchemas');
 
 /**
  * @swagger
@@ -49,7 +36,7 @@ const orderValidation = [
  *       400:
  *         description: Validation error
  */
-router.post('/', ...orderValidation, ctrl.create);
+router.post('/', validateBody(createOrderSchema), ctrl.create);
 
 /**
  * @swagger
@@ -87,6 +74,7 @@ router.get('/', ctrl.getAll);
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [status]
  *             properties:
  *               status:
  *                 type: string
@@ -94,6 +82,8 @@ router.get('/', ctrl.getAll);
  *     responses:
  *       200:
  *         description: Updated order
+ *       400:
+ *         description: Invalid status value
  *       404:
  *         description: Not found
  */

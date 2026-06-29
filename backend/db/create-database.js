@@ -4,26 +4,21 @@
  */
 'use strict';
 
-const path = require('path');
 const { Client } = require('pg');
+const config = require('../config');
 
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-
-const dbName = (process.env.DB_NAME || 'flora_db').trim();
+const dbName = config.db.database.trim();
 
 async function main() {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(dbName)) {
     throw new Error(`Недопустиме ім'я бази в DB_NAME: ${dbName}`);
   }
 
-  const password =
-    process.env.DB_PASSWORD != null ? String(process.env.DB_PASSWORD) : '';
-
   const client = new Client({
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT, 10) || 5432,
-    user: process.env.DB_USER || 'postgres',
-    password,
+    host: config.db.host,
+    port: config.db.port,
+    user: config.db.user,
+    password: config.db.password,
     database: 'postgres',
   });
 

@@ -1,30 +1,20 @@
-const path = require('path');
-const { Pool } = require('pg');
+const { Sequelize } = require('sequelize');
+const config = require('../config');
 
-// Always resolve .env from backend/ (works even if cwd differs, e.g. node db/init.js)
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+const sequelize = new Sequelize(
+  config.db.database,
+  config.db.user,
+  config.db.password,
+  {
+    host: config.db.host,
+    port: config.db.port,
+    dialect: 'postgres',
+    logging: false, // Set to console.log if you want to see SQL queries
+    define: {
+      timestamps: true,
+      underscored: true,
+    },
+  }
+);
 
-function envStr(key, fallback = '') {
-  const v = process.env[key];
-  if (v == null || v === '') return fallback;
-  return String(v);
-}
-
-const pool = new Pool({
-  host: envStr('DB_HOST', 'localhost'),
-  port: parseInt(process.env.DB_PORT, 10) || 5432,
-  database: envStr('DB_NAME', 'flora_db'),
-  user: envStr('DB_USER', 'postgres'),
-  // pg + SCRAM require a real string (undefined breaks with "client password must be a string")
-  password: envStr('DB_PASSWORD', ''),
-});
-
-pool.on('connect', () => {
-  console.log('✅ Connected to PostgreSQL');
-});
-
-pool.on('error', err => {
-  console.error('❌ PostgreSQL error:', err.message);
-});
-
-module.exports = pool;
+module.exports = sequelize;

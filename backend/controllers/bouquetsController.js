@@ -1,170 +1,92 @@
-const pool = require('../db/db');
-const { validationResult } = require('express-validator');
+const fs = require('fs/promises');
+const path = require('path');
+const asyncHandler = require('../middlewares/asyncHandler');
+const bouquetsService = require('../services/bouquetsService');
+const HttpError = require('../helpers/HttpError');
 
-/**
- * GET /api/bouquets
- * Query params: page, limit, category, search, minPrice, maxPrice, bestseller
- */
-const getAll = async (req, res, next) => {
-  try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 15));
-    const offset = (page - 1) * limit;
+const getAll = asyncHandler(async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 15));
+  const { category, search, minPrice, maxPrice, bestseller } = req.query;
 
-    const { category, search, minPrice, maxPrice, bestseller } = req.query;
+  const result = await bouquetsService.findAllPaginated({
+    page,
+    limit,
+    category,
+    search,
+    minPrice,
+    maxPrice,
+    bestsellerOnly: bestseller === 'true',
+  });
+  res.json(result);
+});
 
-    const conditions = [];
-    const params = [];
-    let idx = 1;
-
-    if (category) {
-      conditions.push(`category = $${idx++}`);
-      params.push(category);
-    }
-
-    if (search) {
-      conditions.push(`(name ILIKE $${idx} OR description ILIKE $${idx})`);
-      params.push(`%${search}%`);
-      idx++;
-    }
-
-    if (minPrice) {
-      conditions.push(`price >= $${idx++}`);
-      params.push(parseFloat(minPrice));
-    }
-
-    if (maxPrice) {
-      conditions.push(`price <= $${idx++}`);
-      params.push(parseFloat(maxPrice));
-    }
-
-    if (bestseller === 'true') {
-      conditions.push(`is_bestseller = TRUE`);
-    }
-
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    // Total count
-    const countRes = await pool.query(
-      `SELECT COUNT(*) FROM bouquets ${where}`,
-      params
-    );
-    const total = parseInt(countRes.rows[0].count);
-
-    // Paginated data
-    const dataRes = await pool.query(
-      `SELECT * FROM bouquets ${where}
-       ORDER BY created_at DESC
-       LIMIT $${idx} OFFSET $${idx + 1}`,
-      [...params, limit, offset]
-    );
-
-    res.json({
-      data: dataRes.rows,
-      total,
-      page,
-      perPage: limit,
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (err) {
-    next(err);
+const getById = asyncHandler(async (req, res) => {
+  const row = await bouquetsService.findById(req.params.id);
+  if (!row) {
+    throw new HttpError(404, 'Bouquet not found');
   }
-};
+  res.json(row);
+});
 
-/**
- * GET /api/bouquets/:id
- */
-const getById = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query('SELECT * FROM bouquets WHERE id = $1', [id]);
+const create = asyncHandler(async (req, res) => {
+  const row = await bouquetsService.create(req.body);
+  res.status(201).json(row);
+});
 
-    if (!rows.length) {
-      return res.status(404).json({ message: 'Bouquet not found' });
-    }
+const update = asyncHandler(async (req, res) => {
+  const row = await bouquetsService.updateById(req.params.id, req.body);
+  res.json(row);
+});
 
-    res.json(rows[0]);
-  } catch (err) {
-    next(err);
+const remove = asyncHandler(async (req, res) => {
+  const id = await bouquetsService.deleteById(req.params.id);
+  res.json({ message: 'Bouquet deleted', id });
+});
+
+const updateFavorite = asyncHandler(async (req, res) => {
+  const { favorite } = req.body;
+  const row = await bouquetsService.updateStatus(req.params.id, favorite);
+  res.json(row);
+});
+
+const updatePhoto = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new HttpError(400, 'Image file is required');
   }
-};
 
-/**
- * POST /api/bouquets
- */
-const create = async (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+  const { path: tempPath, originalname } = req.file;
+  const uniqueName = `${req.params.id}_${Date.now()}${path.extname(originalname)}`;
+  const publicDir = path.join(__dirname, '..', 'public', 'photos');
+  const targetPath = path.join(publicDir, uniqueName);
 
   try {
-    const { name, description, price, image_url, category, is_bestseller } = req.body;
+    // Ensure public/photos directory exists
+    await fs.mkdir(publicDir, { recursive: true });
 
-    const { rows } = await pool.query(
-      `INSERT INTO bouquets (name, description, price, image_url, category, is_bestseller)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [name, description, price, image_url || null, category || 'general', is_bestseller || false]
-    );
+    // Move file from temp to public/photos
+    await fs.rename(tempPath, targetPath);
 
-    res.status(201).json(rows[0]);
+    // Save relative URL path in DB
+    const photoURL = `/photos/${uniqueName}`;
+    const row = await bouquetsService.updatePhoto(req.params.id, photoURL);
+
+    res.json(row);
   } catch (err) {
-    next(err);
+    // Cleanup temp file if error occurs
+    try {
+      await fs.unlink(tempPath);
+    } catch (_) {}
+    throw err;
   }
+});
+
+module.exports = {
+  getAll,
+  getById,
+  create,
+  update,
+  remove,
+  updateFavorite,
+  updatePhoto,
 };
-
-/**
- * PUT /api/bouquets/:id
- */
-const update = async (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  try {
-    const { id } = req.params;
-    const { name, description, price, image_url, category, is_bestseller } = req.body;
-
-    const { rows } = await pool.query(
-      `UPDATE bouquets
-       SET name=$1, description=$2, price=$3, image_url=$4,
-           category=$5, is_bestseller=$6
-       WHERE id=$7
-       RETURNING *`,
-      [name, description, price, image_url, category, is_bestseller, id]
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({ message: 'Bouquet not found' });
-    }
-
-    res.json(rows[0]);
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * DELETE /api/bouquets/:id
- */
-const remove = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query(
-      'DELETE FROM bouquets WHERE id=$1 RETURNING id',
-      [id]
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({ message: 'Bouquet not found' });
-    }
-
-    res.json({ message: 'Bouquet deleted', id: rows[0].id });
-  } catch (err) {
-    next(err);
-  }
-};
-
-module.exports = { getAll, getById, create, update, remove };

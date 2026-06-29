@@ -459,13 +459,13 @@ function createBouquetCard(bouquet) {
   const li = document.createElement('li');
   li.className = 'product-card';
   li.dataset.id = String(bouquet.id);
-  li.dataset.name = bouquet.name;
+  li.dataset.name = bouquet.title;
   li.dataset.price = `$${bouquet.price}`;
   li.dataset.description = bouquet.description;
-  const imgSrc = bouquet.image_url || bouquet.image || '';
+  const imgSrc = bouquet.photoURL || '';
   li.dataset.image = imgSrc;
 
-  const safeName = escapeHtml(bouquet.name);
+  const safeName = escapeHtml(bouquet.title);
   const safeDesc = escapeHtml(bouquet.description);
   const safeSrc = escapeHtml(imgSrc);
 
